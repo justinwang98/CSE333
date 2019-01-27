@@ -17,13 +17,19 @@
 #include "HashTable.h"
 #include "HashTable_priv.h"
 
+static bool FindKeyHelper(LLIter listIter, HTKey_t newkey, HTKeyValue **oldnode);
+
 // A private utility function to grow the hashtable (increase
 // the number of buckets) if its load factor has become too high.
 static void ResizeHashtable(HashTable ht);
 
 // a free function that does nothing
-static void LLNullFree(LLPayload_t freeme) { }
-static void HTNullFree(HTValue_t freeme) { }
+static void LLNullFree(LLPayload_t freeme) {
+  free(freeme);
+}
+static void HTNullFree(HTValue_t freeme) {
+  free(freeme);
+}
 
 HashTable AllocateHashTable(HWSize_t num_buckets) {
   HashTable ht;
@@ -165,9 +171,83 @@ int InsertHashTable(HashTable table,
   // and optionally remove a key within a chain, rather than putting
   // all that logic inside here.  You might also find that your helper
   // can be reused in steps 2 and 3.
+  HTKeyValue *kvptr = (HTKeyValue*) malloc(sizeof(HTKeyValue));
+  if (kvptr == NULL) {
+    return 0;
+  }
+  if (NumElementsInLinkedList(insertchain) == 0) {
+  *kvptr = newkeyvalue;
+    if(!AppendLinkedList(insertchain, (LLPayload_t) kvptr)) {
+  	  free(kvptr);
+ 	  return 0;
+    }
+    table->num_elements++;
+    return 1; 
+  }
+  
+  LLIter linkIter = LLMakeIterator(insertchain, 0);
+  if (linkIter == NULL) {
+    free(kvptr);
+    return 0;
+  }
+  // If we don't find it then just insert into list
+  if(FindKeyHelper(linkIter, newkeyvalue.key, &kvptr)) { 
+     //update val
+     //HTKeyValue *temp;
+    LLIteratorGetPayload(linkIter, (LLPayload_t*) kvptr);
 
+    //if (!PushLinkedList(insertchain, (LLPayload_t) kvptr)) {
+    //	    free(kvptr);
+    //	    LLIteratorFree(linkIter);
+    //	    return 0;
+    //} 
+    
+    //*oldkeyvalue = *kvptr;
+    oldkeyvalue->key = kvptr->key;
+    oldkeyvalue->value = kvptr->value;
+    *kvptr = newkeyvalue;
+    //LLIteratorDelete(linkIter, &LLNullFree); 
+    LLIteratorFree(linkIter);   
+    return 2;
+  }
 
-  return 0;  // You may need to change this return value.
+  *kvptr = newkeyvalue;
+  if(!AppendLinkedList(insertchain, (LLPayload_t) kvptr)) {
+    free(kvptr);
+    return 0;
+  }
+  table->num_elements++;
+  *kvptr = newkeyvalue;
+  LLIteratorFree(linkIter);
+  return 1; 
+}
+
+// Helps find a key given a linkedlist iteratory, key to find, and oldkey
+// output param
+// Returns true there was an old key, and false if not.
+static bool FindKeyHelper(LLIter listIter, HTKey_t newkey, HTKeyValue **oldnode) {
+    Verify333(listIter != NULL);
+    
+   // HTKeyValuePtr currKey;
+    while (listIter != NULL && LLIteratorHasNext(listIter)) {
+      LLIteratorGetPayload(listIter, (LLPayload_t *) oldnode);
+      if ((*oldnode)->key == newkey) {
+        // Case that an old key with same value is found
+	//*oldnode = currKey;
+	return true;
+      }
+      LLIteratorNext(listIter);
+    }
+    if (listIter != NULL) {
+    LLIteratorGetPayload(listIter, (LLPayload_t *) oldnode); 
+    if ((*oldnode)->key == newkey) {
+        // Case that an old key with same value is found
+	//*oldnode = currKey;
+	return true;
+      }
+    }
+    // if key wasn't found
+    return false;
 }
 
 int LookupHashTable(HashTable table,
@@ -175,8 +255,26 @@ int LookupHashTable(HashTable table,
                     HTKeyValue *keyvalue) {
   Verify333(table != NULL);
 
-  // Step 2 -- implement LookupHashTable.
+  // Step 2 -- implement LookupHashTable. 
+  
+  HTKeyValue *kvptr;
 
+  // calculate which bucket we're looking into,
+  // grab its linked list chain
+  HWSize_t insertbucket = HashKeyToBucketNum(table, key);
+  LinkedList insertchain = table->buckets[insertbucket]; 
+  if (NumElementsInLinkedList(insertchain) == 0) {
+	  return 0;
+  }
+
+  LLIter linkIter = LLMakeIterator(insertchain, 0);
+  if (linkIter == NULL) {
+    return -1;
+  }
+  if (FindKeyHelper(linkIter, key, &kvptr)) {
+    *keyvalue = *kvptr;
+    return 1; 
+  }
 
   return 0;  // you may need to change this return value.
 }
@@ -188,6 +286,30 @@ int RemoveFromHashTable(HashTable table,
 
   // Step 3 -- implement RemoveFromHashTable.
 
+  HTKeyValue *kvptr;
+
+  // calculate which bucket we're deleting from,
+  // grab its linked list chain
+  HWSize_t insertbucket = HashKeyToBucketNum(table, key);
+  LinkedList insertchain = table->buckets[insertbucket]; 
+  if (NumElementsInLinkedList(insertchain) == 0) {
+	  return 0;
+  }
+  LLIter linkIter = LLMakeIterator(insertchain, 0);
+  if (linkIter == NULL) {
+    return -1;
+  }
+  if (FindKeyHelper(linkIter, key, &kvptr)) {
+    keyvalue->key = kvptr->key;
+    keyvalue->value = kvptr->value;
+    //free(kvptr); 
+    //LLIteratorDelete(linkIter, (LLPayloadFreeFnPtr) LLNullFree);
+    LLIteratorFree(linkIter);
+    table->num_elements--;
+    
+    return 1; 
+  }
+  LLIteratorFree(linkIter);
   return 0;  // you may need to change this return value.
 }
 
@@ -246,25 +368,64 @@ int HTIteratorNext(HTIter iter) {
   Verify333(iter != NULL);
 
   // Step 4 -- implement HTIteratorNext.
+  //check if bucket is valid
+  if (!(iter->is_valid)) {
+	  return 0;
+  }
+// check if curr bucket can be moved thru
+  if (LLIteratorHasNext(iter->bucket_it)) {
+	  LLIteratorNext(iter->bucket_it);
+	  return 1;
+  }
+// last bucket then set to false
+  if (iter->bucket_num == iter->ht->num_buckets - 1) {
+	  iter->is_valid = false;
+	  return 0;
+  }
 
-
-  return 0;  // you might need to change this return value.
+  for (int i = iter->bucket_num + 1; i < iter->ht->num_buckets; i++) {
+    if (NumElementsInLinkedList(iter->ht->buckets[i]) > 0) {
+	    iter->bucket_num = i;
+	    if (i == iter->ht->num_buckets) {
+		    iter->is_valid = false;
+		    return 0;
+	    } else {
+		    break;
+	    }
+    }
+  }
+  // no buckets left
+  LLIteratorFree(iter->bucket_it);
+  iter->bucket_it = LLMakeIterator(iter->ht->buckets[iter->bucket_num],0);
+  if(iter->bucket_it == NULL) {
+	  iter->is_valid = false;
+	  return 0;
+  }
+  return 1;  // you might need to change this return value.
 }
 
 int HTIteratorPastEnd(HTIter iter) {
   Verify333(iter != NULL);
 
   // Step 5 -- implement HTIteratorPastEnd.
-
-
-  return 0;  // you might need to change this return value.
+  if (!(iter->is_valid)) {
+	  return 1;
+  } else {
+    return 0; 
+  }  // you might need to change this return value.
 }
 
 int HTIteratorGet(HTIter iter, HTKeyValue *keyvalue) {
   Verify333(iter != NULL);
 
   // Step 6 -- implement HTIteratorGet.
+  HTKeyValue *temp;
 
+  if (iter->is_valid) {
+	  LLIteratorGetPayload(iter->bucket_it, (LLPayload_t*) &temp);
+	  *keyvalue = *temp;
+	  return 1;
+  }
 
   return 0;  // you might need to change this return value.
 }

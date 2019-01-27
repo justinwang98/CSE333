@@ -26,7 +26,9 @@ LinkedList AllocateLinkedList(void) {
 
   // Step 1.
   // initialize the newly allocated record structure
-
+  ll->num_elements = 0;
+  ll->head = NULL;
+  ll->tail = NULL;
 
 
   // return our newly minted linked list
@@ -43,7 +45,10 @@ void FreeLinkedList(LinkedList list,
   // sweep through the list and free all of the nodes' payloads as
   // well as the nodes themselves
   while (list->head != NULL) {
-
+    LinkedListNodePtr temp = list->head;
+    list->head = list->head->next;
+    payload_free_function(temp->payload);
+    free(temp);
   }
 
   // free the list record
@@ -85,8 +90,11 @@ bool PushLinkedList(LinkedList list, LLPayload_t payload) {
 
   // STEP 3.
   // typical case; list has >=1 elements
-
-
+  list->head->prev = ln;
+  ln->prev = NULL;
+  ln->next = list->head;
+  list->head = ln;
+  list->num_elements = list->num_elements + 1;
 
   // return success
   return true;
@@ -103,9 +111,27 @@ bool PopLinkedList(LinkedList list, LLPayload_t *payload_ptr) {
   // and (b) the general case of a list with >=2 elements in it.
   // Be sure to call free() to deallocate the memory that was
   // previously allocated by PushLinkedList().
-
-
-
+  
+  // degerenate case:
+  if (list->num_elements == 0) {
+    Verify333(list->head == NULL);
+    Verify333(list->tail == NULL);
+    return false;
+  } 
+  
+  *payload_ptr = list->head->payload;
+  
+  if (list->num_elements == 1) { 
+    // case with 1 element
+    free(list->head);
+    list->head = NULL;
+    list->tail = NULL;
+  } else { // 2+ elements
+    list->head = list->head->next;
+    free(list->head->prev);
+    list->head->prev = NULL;
+  }
+  list->num_elements = list->num_elements - 1;
   return true;
 }
 
@@ -116,21 +142,64 @@ bool AppendLinkedList(LinkedList list, LLPayload_t payload) {
   // Step 5: implement AppendLinkedList.  It's kind of like
   // PushLinkedList, but obviously you need to add to the end
   // instead of the beginning.
+  
+  Verify333(list != NULL);
 
+  // allocate space for the new node.
+  LinkedListNodePtr ln =
+    (LinkedListNodePtr) malloc(sizeof(LinkedListNode));
+  if (ln == NULL) {
+    // out of memory
+    return false;
+  }
 
+  // set the payload
+  ln->payload = payload;
+
+  if (list->num_elements == 0) {
+    // degenerate case; list is currently empty
+    Verify333(list->head == NULL);  // debugging aid
+    Verify333(list->tail == NULL);  // debugging aid
+    ln->next = ln->prev = NULL;
+    list->head = list->tail = ln;
+    list->num_elements = 1U;
+    return true;
+  }
+
+  // typical case; list has >=1 elements
+  list->tail->next = ln;
+  ln->next = NULL;
+  ln->prev = list->tail;
+  list->tail = ln;
+  list->num_elements = list->num_elements + 1;
 
   return true;
 }
 
 bool SliceLinkedList(LinkedList list, LLPayload_t *payload_ptr) {
-  // defensive programming.
   Verify333(payload_ptr != NULL);
   Verify333(list != NULL);
 
   // Step 6: implement SliceLinkedList.
-
-
-
+  // degerenate case:
+  if (list->num_elements == 0) {
+    Verify333(list->head == NULL);
+    Verify333(list->tail == NULL);
+    return false;
+  } 
+  
+  *payload_ptr = list->tail->payload;
+  if (list->num_elements == 1) { 
+    // case with 1 element
+    free(list->tail);
+    list->head = NULL;
+    list->tail = NULL;
+  } else { // 2+ elements
+    list->tail = list->tail->prev;
+    free(list->tail->next);
+    list->tail->next = NULL;
+  }
+  list->num_elements = list->num_elements - 1;
   return true;
 }
 
@@ -223,8 +292,10 @@ bool LLIteratorNext(LLIter iter) {
 
   // Step 7: if there is another node beyond the iterator, advance to it,
   // and return true.
-
-
+  if (LLIteratorHasNext(iter)) {
+    iter->node = iter->node->next;
+    return true;
+  }
 
   // Nope, there isn't another node, so return failure.
   return false;
@@ -251,8 +322,10 @@ bool LLIteratorPrev(LLIter iter) {
 
   // Step 8:  if there is another node beyond the iterator, advance to it,
   // and return true.
-
-
+  if (LLIteratorHasPrev(iter)) {
+    iter->node = iter->node->prev;
+    return true;
+  }
 
   // nope, so return failure.
   return false;
@@ -270,9 +343,6 @@ void LLIteratorGetPayload(LLIter iter, LLPayload_t *payload) {
 
 bool LLIteratorDelete(LLIter iter,
                       LLPayloadFreeFnPtr payload_free_function) {
-  // defensive programming
-  Verify333(iter != NULL);
-  Verify333(iter->list != NULL);
   Verify333(iter->node != NULL);
 
   // Step 9: implement LLIteratorDelete.  This is the most
@@ -288,9 +358,55 @@ bool LLIteratorDelete(LLIter iter,
   // Be sure to call the payload_free_function to free the payload
   // the iterator is pointing to, and also free any LinkedList
   // data structure element as appropriate.
-
-
-
+  
+  // free the payload
+  
+  //case empty
+  LinkedList list = iter->list;
+  LinkedListNodePtr old = iter->node;
+  LLPayload_t payload = iter->node->payload;
+  if (list->num_elements == 1) {
+    //PopLinkedList(list, &payload);
+    payload_free_function(payload);
+    iter->node = NULL;
+    list->num_elements = 0;
+    list->head = NULL;
+    list->tail = NULL;
+    free(old);
+    return false;
+  }
+  list->num_elements--;
+  // case iter points at head
+  if (list->head == iter->node) {
+    //PopLinkedList(list, &payload);
+    payload_free_function(payload);
+    iter->node = iter->node->next;
+    list->head = iter->node;
+    iter->node->prev = NULL;
+    //iter->node = list->head; 
+  } else if (list->tail == iter->node) { // case iter points to tail
+    //SliceLinkedList(list, &payload);
+    payload_free_function(payload);
+    iter->node = iter->node->prev;
+    list->tail = iter->node;
+    iter->node->next = NULL;
+    //iter->node = list->tail;
+  } else { // case middle of the list
+    
+    // set prev nodes next to iter->next
+    iter->node->prev->next = iter->node->next;
+    
+    // set next nodes prev to iter->prev
+    iter->node->next->prev = iter->node->prev;
+    
+    // free the payload
+    payload_free_function(payload);
+    
+    LinkedListNodePtr temp = iter->node->next;
+    
+    iter->node = temp;
+  }
+  free(old);
   return true;
 }
 
