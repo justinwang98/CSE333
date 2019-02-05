@@ -1,0 +1,19 @@
+
+  ====  CSE 333 HW1 Feedback  ====
+
+Just a reminder to pay attention to the deadline for future homeworks.
+
+Test Suite: 230/230
+
+Valgrind:  2/5
+(-3) Valgrind returns a number of memory leaks and errors.
+
+Code quality - modularity
+and error checking:          10/10
+
+Style issues, comments and
+blending with starter code:  7/10
+(-3) clint returns a number of formatting errors.
+(-0) It is more useful to provide comments near the declaration than near the definition.
+
+Extra credit:  /5
