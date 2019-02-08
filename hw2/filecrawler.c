@@ -98,7 +98,7 @@ static void HandleDir(char *dirpath, DIR *d, DocTable *doctable,
     // "d_name" field of the struct dirent returned by readdir(), and you can
     // use strcmp() to compare it to "." or ".."
 
-    if (strcmp(dirent->d_name,".") != 0 || strcmp(dirent->d_name, "..") != 0) {
+    if (strcmp(dirent->d_name,".") == 0 || strcmp(dirent->d_name, "..") == 0) {
       continue;
     }
 
@@ -138,9 +138,14 @@ static void HandleDir(char *dirpath, DIR *d, DocTable *doctable,
         HandleFile(newfile, doctable, index);
       }
       if (S_ISDIR(nextstat.st_mode)) {
-        d = opendir(newfile);
-	HandleDir(newfile, d, doctable, index);
-	closedir(d);
+        DIR *d2 = opendir(newfile);
+	//if (d2 == NULL) {
+        //  free(newfile);
+	//  continue;
+	//}
+	Verify333(d2 != NULL);
+	HandleDir(newfile, d2, doctable, index);
+	closedir(d2);
       }
     }
 
@@ -154,12 +159,13 @@ static void HandleFile(char *fpath, DocTable *doctable, MemIndex *index) {
   HashTable tab = NULL;
   DocID_t docID;
   HTIter it;
-
   // STEP 4.
   // Invoke the BuildWordHT() function in fileparser.h/c to
   // build the word hashtable out of the file.
   tab = BuildWordHT(fpath);
-  Verify333(tab != NULL);
+  if (tab == NULL) {
+    return;
+  }
 
   // STEP 5.
   // Invoke the DTRegisterDocumentName() function in

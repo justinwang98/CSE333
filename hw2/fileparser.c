@@ -55,7 +55,7 @@ char *ReadFile(const char *filename, HWSize_t *size) {
   // STEP 1.
   // Use the stat system call to fetch a "struct stat" that describes
   // properties of the file. ("man 2 stat"). [You can assume we're on a 64-bit
-  // system, with a 64-bit off_t field.]
+  // system, with a 64-bit off_t field.
   if (stat(filename, &filestat) == -1) {
     return NULL;
   }
@@ -71,11 +71,13 @@ char *ReadFile(const char *filename, HWSize_t *size) {
   // STEP 3.
   // Attempt to open the file for reading.  (man 2 open)
   fd = open(filename, O_RDONLY);
+  Verify333(fd != -1);
 
   // STEP 4.
   // Allocate space for the file, plus 1 extra byte to
   // NULL-terminate the string.
   buf = (char*) malloc(filestat.st_size * sizeof(char));
+  Verify333(buf != NULL);
 
   // STEP 5.
   // Read in the file contents.  Use the read system call. (man 2 read.)  Be
@@ -94,9 +96,10 @@ char *ReadFile(const char *filename, HWSize_t *size) {
     if (numread == -1){
       if (errno == EAGAIN || errno == EINTR) {
         // case that the the open can be blocked
-        fd = open(filename, O_RDONLY | O_NONBLOCK);
+	fd = open(filename, O_RDONLY | O_NONBLOCK);
       } else {
 	// unrecoverable error
+	free(buf);
         return NULL;
       }
     }

@@ -71,7 +71,6 @@ int MIAddPostingList(MemIndex index, char *word, DocID_t docid,
   HTKeyValue kv, hitkv;
   WordDocSet *wds;
   int res;
-
   // STEP 1.
   // Remove this "return 1;". We added this in here
   // so that your filecrawler unit tests would pass
@@ -79,7 +78,7 @@ int MIAddPostingList(MemIndex index, char *word, DocID_t docid,
   // memindex.c implementation.
 
   return 1;
-
+ 
   // First, we have to see if the word we're being handed
   // already exists in the inverted index.
   res = LookupHashTable(index, wordkey, &kv);
@@ -94,6 +93,18 @@ int MIAddPostingList(MemIndex index, char *word, DocID_t docid,
     //   (3) insert that hashtable into the WordDocSet, and
     //   (4) insert the the new WordDocSet into the inverted
     //       index (i.e., into the "index" table).
+    wds = (WordDocSet*) malloc(sizeof(WordDocSet));
+    // 1
+    wds->word = word;
+    // 2
+    HashTable table = AllocateHashTable(256);
+    // 3
+    wds->docIDs = table;
+    // 4
+    kv.key = wordkey;
+    kv.value = wds;
+    int inserted = InsertHashTable((HashTable) index, kv, &hitkv);
+    Verify333(inserted != 0);
   } else {
     // Yes, this word already exists in the inverted index.
     // So, there's no need to insert it again; we can go
@@ -114,7 +125,11 @@ int MIAddPostingList(MemIndex index, char *word, DocID_t docid,
   // The entry's key is this docID and the entry's value
   // is the "positions" word positions list we were passed
   // as an argument.
-
+  HTKeyValue newkv;
+  newkv.key = docid;
+  newkv.value = (void*) positions;
+  int inserted2 = InsertHashTable(wds->docIDs, newkv, &hitkv);
+  Verify333(inserted2 != 0);
 
   return 1;
 }
@@ -149,8 +164,32 @@ LinkedList MIProcessQuery(MemIndex index, char *query[], uint8_t qlen) {
   // Then, append the SearchResult structure onto retlist.
   //
   // If there are no matching documents, free retlist and return NULL.
+  
+  wordkey = FNVHash64((unsigned char *) query[0], strlen(query[0]));
+  Verify333(-1 != LookupHashTable((HashTable) index, wordkey, &kv));
+  wds = kv.value; 
+  
+  if (NumElementsInHashTable(wds->docIDs) == 0) { //worddocset has no elements 
+    free(retlist);
+    return NULL;
+  }
 
-
+  HTIter iter = HashTableMakeIterator(wds->docIDs);
+  while (HTIteratorPastEnd(iter) != 1) {
+    HTKeyValue docsInWds;
+    res = HTIteratorGet(iter, &docsInWds);
+    if (res == 1) {
+      SearchResultPtr search = (SearchResultPtr) malloc(sizeof(SearchResult));
+      search->docid = (DocID_t) docsInWds.key;
+      search->rank = NumElementsInLinkedList(*((LinkedList*)docsInWds.value));
+      Verify333(AppendLinkedList(retlist, (LLPayload_t) search) != false);
+    }
+    res = HTIteratorNext(iter);
+    if (res == 0) { //iterator unusesable
+      break;
+    }
+  }
+  HTIteratorFree(iter);
   // Great; we have our search results for the first query
   // word.  If there is only one query word, we're done!
   // Sort the result list and return it to the caller.
@@ -170,7 +209,14 @@ LinkedList MIProcessQuery(MemIndex index, char *query[], uint8_t qlen) {
     // Look up the next query word (query[i]) in the inverted index.
     // If there are no matches, it means the overall query
     // should return no documents, so free retlist and return NULL.
-
+    
+    wordkey = FNVHash64((unsigned char *) query[i], strlen(query[i]));
+    int checkIndex = LookupHashTable((HashTable) index, wordkey, &kv);
+    Verify333(checkIndex != -1);
+    if (checkIndex == 0) {
+      free(retlist);
+      return NULL;
+    }
 
     // STEP 6.
     // There are matches.  We're going to iterate through
@@ -183,11 +229,24 @@ LinkedList MIProcessQuery(MemIndex index, char *query[], uint8_t qlen) {
     // number of matches for the current word.
     //
     // If it isn't, we delete that docID from the search result list.
+    wds = kv.value;
     llit = LLMakeIterator(retlist, 0);
     Verify333(llit != NULL);
     ne = NumElementsInLinkedList(retlist);
     for (j = 0; j < ne; j++) {
-
+      SearchResult* searchRes;
+      LLIteratorGetPayload(llit, (LLPayload_t *) &searchRes);
+      HTKeyValue keyInWDs;
+      int idResult = LookupHashTable(wds->docIDs, (HTKey_t) searchRes->docid, &keyInWDs);
+      Verify333(idResult != -1);
+      
+      // check if the id from the given searchResult is also inside the query matches
+      if (1 == idResult) {
+        searchRes->rank = NumElementsInLinkedList(*((LinkedList*)keyInWDs.value));
+      } else { // if not found, 0 value
+        LLIteratorDelete(llit, &free);
+      }
+      LLIteratorNext(llit);
     }
     LLIteratorFree(llit);
 
