@@ -77,7 +77,7 @@ int MIAddPostingList(MemIndex index, char *word, DocID_t docid,
   // even though you hadn't yet finished the
   // memindex.c implementation.
 
-  return 1;
+  //return 1;
  
   // First, we have to see if the word we're being handed
   // already exists in the inverted index.
@@ -166,30 +166,31 @@ LinkedList MIProcessQuery(MemIndex index, char *query[], uint8_t qlen) {
   // If there are no matching documents, free retlist and return NULL.
   
   wordkey = FNVHash64((unsigned char *) query[0], strlen(query[0]));
-  Verify333(-1 != LookupHashTable((HashTable) index, wordkey, &kv));
-  wds = kv.value; 
+  res = LookupHashTable((HashTable)index, wordkey, &kv);
+  Verify333(-1 != res);
   
-  if (NumElementsInHashTable(wds->docIDs) == 0) { //worddocset has no elements 
-    free(retlist);
+  if (res == 0) { //worddocset has no elements 
+    FreeLinkedList(retlist, &free);
     return NULL;
   }
 
+  wds = kv.value;
   HTIter iter = HashTableMakeIterator(wds->docIDs);
+  HTKeyValue docsInWds;
   while (HTIteratorPastEnd(iter) != 1) {
-    HTKeyValue docsInWds;
     res = HTIteratorGet(iter, &docsInWds);
-    if (res == 1) {
-      SearchResultPtr search = (SearchResultPtr) malloc(sizeof(SearchResult));
-      search->docid = (DocID_t) docsInWds.key;
-      search->rank = NumElementsInLinkedList(*((LinkedList*)docsInWds.value));
-      Verify333(AppendLinkedList(retlist, (LLPayload_t) search) != false);
-    }
+	Verify333(res == 1);
+    SearchResultPtr search = (SearchResultPtr) malloc(sizeof(SearchResult));
+    search->docid = (DocID_t) docsInWds.key;
+    search->rank = NumElementsInLinkedList(docsInWds.value);
+    Verify333(AppendLinkedList(retlist, (LLPayload_t) search) != false);
     res = HTIteratorNext(iter);
     if (res == 0) { //iterator unusesable
       break;
     }
   }
   HTIteratorFree(iter);
+
   // Great; we have our search results for the first query
   // word.  If there is only one query word, we're done!
   // Sort the result list and return it to the caller.
@@ -213,8 +214,9 @@ LinkedList MIProcessQuery(MemIndex index, char *query[], uint8_t qlen) {
     wordkey = FNVHash64((unsigned char *) query[i], strlen(query[i]));
     int checkIndex = LookupHashTable((HashTable) index, wordkey, &kv);
     Verify333(checkIndex != -1);
+
     if (checkIndex == 0) {
-      free(retlist);
+      FreeLinkedList(retlist, &free);
       return NULL;
     }
 
@@ -242,11 +244,11 @@ LinkedList MIProcessQuery(MemIndex index, char *query[], uint8_t qlen) {
       
       // check if the id from the given searchResult is also inside the query matches
       if (1 == idResult) {
-        searchRes->rank = NumElementsInLinkedList(*((LinkedList*)keyInWDs.value));
+        searchRes->rank += NumElementsInLinkedList(keyInWDs.value);
+		LLIteratorNext(llit);
       } else { // if not found, 0 value
         LLIteratorDelete(llit, &free);
       }
-      LLIteratorNext(llit);
     }
     LLIteratorFree(llit);
 
@@ -258,6 +260,7 @@ LinkedList MIProcessQuery(MemIndex index, char *query[], uint8_t qlen) {
       return NULL;
     }
   }
+
 
   // Sort the result list by rank and return it to the caller.
   SortLinkedList(retlist, 0, &MISearchListComparator);

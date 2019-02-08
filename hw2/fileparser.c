@@ -48,14 +48,14 @@ static void LoopAndInsert(HashTable tab, char *content);
 char *ReadFile(const char *filename, HWSize_t *size) {
   struct stat filestat;
   char *buf;
-  int fd;
+  int result, fd;
   ssize_t numread;
   size_t left_to_read;
 
   // STEP 1.
   // Use the stat system call to fetch a "struct stat" that describes
   // properties of the file. ("man 2 stat"). [You can assume we're on a 64-bit
-  // system, with a 64-bit off_t field.
+  // system, with a 64-bit off_t field.]
   if (stat(filename, &filestat) == -1) {
     return NULL;
   }
@@ -76,7 +76,7 @@ char *ReadFile(const char *filename, HWSize_t *size) {
   // STEP 4.
   // Allocate space for the file, plus 1 extra byte to
   // NULL-terminate the string.
-  buf = (char*) malloc(filestat.st_size * sizeof(char));
+  buf = (char*) malloc(filestat.st_size * sizeof(char) + 1);
   Verify333(buf != NULL);
 
   // STEP 5.
@@ -88,22 +88,21 @@ char *ReadFile(const char *filename, HWSize_t *size) {
   // recoverable error.  (Read the man page for "read()" carefully, in
   // particular what the return values -1 and 0 imply.)
   left_to_read = filestat.st_size;
+  numread = filestat.st_size;
   while (left_to_read > 0) {
     // read returns 0 when nothing left to read
     // read returns -1 on error
-    numread = read(fd, buf, left_to_read);
+    result = read(fd, buf + (numread - left_to_read), left_to_read);
     
-    if (numread == -1){
-      if (errno == EAGAIN || errno == EINTR) {
-        // case that the the open can be blocked
-	fd = open(filename, O_RDONLY | O_NONBLOCK);
-      } else {
-	// unrecoverable error
-	free(buf);
+    if (result == -1){
+      if (errno != EAGAIN && errno != EINTR) {
         return NULL;
-      }
+	  }
+	  else {
+		  continue;
+	  }
     }
-    left_to_read -= numread;
+    left_to_read -= result;
   }
 
   // Great, we're done!  We hit the end of the file and we
@@ -214,6 +213,7 @@ static void LoopAndInsert(HashTable tab, char *content) {
   //
   //    AddToHashTable(tab, wordstart, pos);
   //
+  
   DocPositionOffset_t count = 0;
   DocPositionOffset_t pos = 0;
   // ends when the curptr is pointing to the null terminator
@@ -227,7 +227,7 @@ static void LoopAndInsert(HashTable tab, char *content) {
    // printf("i got alpha %d times, char: %c\n", count, *curptr);
       if (count == 0 || *(curptr - 1) == '\0') { // start of new word
         wordstart = curptr;
-	pos = count;
+	    pos = count;
       }
       *curptr = tolower(*curptr);
     }
