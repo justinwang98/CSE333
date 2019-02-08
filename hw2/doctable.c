@@ -42,7 +42,8 @@ void FreeDocTable(DocTable table) {
   Verify333(table != NULL);
 
   // STEP 1.
-
+  FreeHashTable(table->docid_to_docname, &free);
+  FreeHashTable(table->docname_to_docid, &free);
   free(table);
 }
 
@@ -71,6 +72,12 @@ DocID_t DTRegisterDocumentName(DocTable table, char *docname) {
   // free up the malloc'ed space and return the existing docid
 
   // STEP 2.
+  if (1 == LookupHashTable(table->docname_to_docid, FNVHash64((unsigned char *) doccopy, strlen(doccopy)), &oldkv)) {
+    free(doccopy);
+    free(docid);
+    res = *((DocID_t*) oldkv.value);
+    return res;
+  }
 
   // allocate the next docID
   table->max_id += 1;
@@ -79,12 +86,18 @@ DocID_t DTRegisterDocumentName(DocTable table, char *docname) {
   // STEP 3.
   // Set up the key/value for the docid_to_docname mapping, and
   // do the insert.
-
+  kv.key = *docid;
+  kv.value = doccopy;
+  InsertHashTable(table->docid_to_docname, kv, &oldkv);
 
   // STEP 4.
   // Set up the key/value for the docname_to_docid mapping, and
   // do the insert.
 
+  kv.key = FNVHash64((unsigned char *) doccopy, strlen(doccopy));
+  kv.value = docid;
+  InsertHashTable(table->docname_to_docid, kv, &oldkv);
+  
   return *docid;
 }
 
@@ -101,6 +114,15 @@ DocID_t DTLookupDocumentName(DocTable table, char *docname) {
   // docname_to_docid table within dt, and return
   // either "0" if the docname isn't found or the
   // docID if it is.
+  key = FNVHash64((unsigned char *) docname, strlen(docname));
+
+  res = LookupHashTable(table->docname_to_docid, key, &kv);
+  Verify333(res != -1);
+  if (res == 1) {
+    return *((DocID_t*) kv.value);
+  } else {
+    return res;
+  }
 }
 
 char *DTLookupDocID(DocTable table, DocID_t docid) {
@@ -115,6 +137,14 @@ char *DTLookupDocID(DocTable table, DocID_t docid) {
   // and either return the string (i.e., the (char *)
   // saved in the value field for that key) or
   // NULL if the key isn't in the table.
+
+  res = LookupHashTable(table->docid_to_docname, docid, &kv);
+  Verify333(res != -1);
+  if (res == 1) {
+    return (char*) kv.value;
+  } else {
+    return NULL;
+  }
 }
 
 HashTable DTGetDocidTable(DocTable table) {

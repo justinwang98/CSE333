@@ -48,7 +48,7 @@ static void LoopAndInsert(HashTable tab, char *content);
 char *ReadFile(const char *filename, HWSize_t *size) {
   struct stat filestat;
   char *buf;
-  int result, fd;
+  int fd;
   ssize_t numread;
   size_t left_to_read;
 
@@ -56,22 +56,26 @@ char *ReadFile(const char *filename, HWSize_t *size) {
   // Use the stat system call to fetch a "struct stat" that describes
   // properties of the file. ("man 2 stat"). [You can assume we're on a 64-bit
   // system, with a 64-bit off_t field.]
-
+  if (stat(filename, &filestat) == -1) {
+    return NULL;
+  }
 
   // STEP 2.
   // Make sure this is a "regular file" and not a directory
   // or something else.  (use the S_ISREG macro described
   // in "man 2 stat")
-
-
+  if (!S_ISREG(filestat.st_mode)) {
+    return NULL;
+  }
+  
   // STEP 3.
   // Attempt to open the file for reading.  (man 2 open)
-
+  fd = open(filename, O_RDONLY);
 
   // STEP 4.
   // Allocate space for the file, plus 1 extra byte to
   // NULL-terminate the string.
-
+  buf = (char*) malloc(filestat.st_size * sizeof(char));
 
   // STEP 5.
   // Read in the file contents.  Use the read system call. (man 2 read.)  Be
@@ -83,7 +87,20 @@ char *ReadFile(const char *filename, HWSize_t *size) {
   // particular what the return values -1 and 0 imply.)
   left_to_read = filestat.st_size;
   while (left_to_read > 0) {
-
+    // read returns 0 when nothing left to read
+    // read returns -1 on error
+    numread = read(fd, buf, left_to_read);
+    
+    if (numread == -1){
+      if (errno == EAGAIN || errno == EINTR) {
+        // case that the the open can be blocked
+        fd = open(filename, O_RDONLY | O_NONBLOCK);
+      } else {
+	// unrecoverable error
+        return NULL;
+      }
+    }
+    left_to_read -= numread;
   }
 
   // Great, we're done!  We hit the end of the file and we
@@ -112,7 +129,10 @@ HashTable BuildWordHT(char *filename) {
   // file turns out to be empty (i.e., its length is 0),
   // or you couldn't read the file at all, return NULL to indicate
   // failure.
-
+  filecontent = ReadFile(filename, &filelen);
+  if (filecontent == NULL || filelen == 0) {
+    return NULL;
+  }
 
   // Verify that the file contains only ASCII text.  We won't try to index any
   // files that contain non-ASCII text; unfortunately, this means we aren't
@@ -131,7 +151,7 @@ HashTable BuildWordHT(char *filename) {
   // number of buckets.
   tab = AllocateHashTable(64);
   Verify333(tab != NULL);
-
+  
   // Loop through the file, splitting it into words and inserting a record for
   // each word.
   LoopAndInsert(tab, filecontent);
@@ -191,9 +211,25 @@ static void LoopAndInsert(HashTable tab, char *content) {
   //
   //    AddToHashTable(tab, wordstart, pos);
   //
-
-  while (1) {
-
+  DocPositionOffset_t count = 0;
+  DocPositionOffset_t pos = 0;
+  // ends when the curptr is pointing to the null terminator
+  while (*curptr != '\0') {
+    if (isalpha(*curptr) == 0) { // non alphabetic
+      *curptr = '\0';
+      if (isalpha(*(curptr - 1))) { // end of new word
+        AddToHashTable(tab, wordstart, pos);
+      }
+    } else { // curr is alphabetic 
+   // printf("i got alpha %d times, char: %c\n", count, *curptr);
+      if (count == 0 || *(curptr - 1) == '\0') { // start of new word
+        wordstart = curptr;
+	pos = count;
+      }
+      *curptr = tolower(*curptr);
+    }
+    curptr++;
+    count++;
   }
 }
 
@@ -222,8 +258,21 @@ static void AddToHashTable(HashTable tab, char *word, DocPositionOffset_t pos) {
     // No; this is the first time we've seen this word.  Allocate and prepare
     // a new WordPositions structure, and append the new position to its list
     // using a similar ugly hack as right above.
-    WordPositions *wp;
-    char *newstr;
-
+    WordPositions *wp = (WordPositions *) malloc(sizeof(WordPositions));
+   
+    char *newstr = (char*) malloc(strlen(word) * sizeof(char) + 1);
+    strncpy(newstr, word, strlen(word) + 1);  
+    wp->word = newstr;
+   
+    LinkedList list = AllocateLinkedList();
+    wp->positions = list;
+   
+    retval = AppendLinkedList(wp->positions, (LLPayload_t) ((intptr_t) pos));
+    Verify333(retval != 0);
+    
+    HTKeyValue old;
+    kv.key = hashKey;
+    kv.value = (void*) wp;
+    retval = InsertHashTable(tab, kv, &old);
   }
 }

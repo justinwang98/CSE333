@@ -296,7 +296,7 @@ TEST_F(Test_LinkedList, TestLLIteratorBasic) {
   LLIteratorGetPayload(lli, &payload);
   ASSERT_EQ(kFive, payload);
   HW1Addpoints(10);
-
+  
   // The list contains 5 elements. Try a delete from the front of the list.
   // (i.e., delete element 1/5.)
   free_count = 0;
