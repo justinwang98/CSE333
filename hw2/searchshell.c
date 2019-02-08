@@ -41,6 +41,62 @@ int main(int argc, char **argv) {
   // When searchshell detects end-of-file on stdin (cntrl-D from the
   // keyboard), searchshell should free all dynamically allocated
   // memory and any other allocated resources and then exit.
+ 
+  // crawl dir and build memindex
+  DocTable doctable;
+  MemIndex memindex;
+  printf("Indexing '%s'\n", argv[1]);
+  Verify333(CrawlFileTree(argv[1], &doctable, &memindex) == 1);
+
+  int length = 0;
+  char* userquery[64];
+
+  while (1) {
+    int buffsize = 256;
+    char* buffer = (char*) malloc(buffsize);
+    
+    printf("enter query:\n");
+    fgets(buffer, buffsize - 1, stdin);
+    for (int i =0; i< buffsize - 1; i++) {
+      if (buffer[i] == '\n') {
+        buffer[i] = '\0';
+	break;
+      }
+    }
+    //get elements
+    char* saveptr;
+    userquery[length] = strtok_r(buffer, " ", &saveptr);
+    if (userquery[length] == NULL) {
+      printf("bad input");
+    }
+    length++;
+    while (1) { // fence post to use strtok_r
+      userquery[length] = strtok_r(NULL, " ", &saveptr);
+      if (userquery[length] == NULL) {
+	break;
+      }
+      length++;
+    }
+   
+    LinkedList list = MIProcessQuery(memindex, (char**) userquery, length);
+    if (list != NULL) { // non empty result
+      SearchResult* search;
+      int num = NumElementsInLinkedList(list);
+      LLIter iter = LLMakeIterator(list, 0);
+
+      for (int i = 0; i < num; i++) {
+        LLIteratorGetPayload(iter, (LLPayload_t*) &search);
+        printf( "  %s (%u)\n", DTLookupDocID(doctable, search->docid), search->rank);
+	LLIteratorDelete(iter, &free);
+      }
+      LLIteratorFree(iter);
+      FreeLinkedList(list, &free);
+    }
+    length = 0;
+  }
+  FreeDocTable(doctable);
+  FreeMemIndex(memindex);
+
 
   return EXIT_SUCCESS;
 }

@@ -220,7 +220,7 @@ static void LoopAndInsert(HashTable tab, char *content) {
   while (*curptr != '\0') {
     if (isalpha(*curptr) == 0) { // non alphabetic
       *curptr = '\0';
-      if (isalpha(*(curptr - 1))) { // end of new word
+      if (count != 0 && isalpha(*(curptr - 1))) { // end of new word
         AddToHashTable(tab, wordstart, pos);
       }
     } else { // curr is alphabetic 
