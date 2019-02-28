@@ -1,0 +1,19 @@
+
+  ====  CSE 333 HW2 Feedback  ====
+
+Test Suite: 270/270
+
+Valgrind:  5/5
+
+Code quality - modularity
+and error checking:         9/10
+(-1) Ignores failures of any function. LLMakeIterator and malloc are the most common.
+
+Style issues, comments and 
+blending with starter code:  7/10
+(-3) Clint returns many formatting errors.
+
+Searchshell:   3/5
+(-2) searchshell does not exit gracefully upon EOF or Ctrl+D. FreeDocTable and FreeMemIndex are never reached.
+
+Extra credit:  /5
