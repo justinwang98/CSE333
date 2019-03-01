@@ -33,15 +33,17 @@ FileIndexReader::FileIndexReader(std::string filename,
 
   // Make the (FILE *) be unbuffered.  ("man setbuf")
   // MISSING:
-
+  setbuf(file_, NULL);
 
   // Read the entire file header and convert to host format.
   // MISSING:
 
-
+  Verify333(0 != fread(&header_, sizeof(IndexFileHeader), 1, file_));
+  header_.toHostFormat();
+  
   // Verify that the magic number is correct.  Crash if not.
   // MISSING:
-
+  Verify333(header_.magic_number == 0xCAFEF00D);
 
   // Make sure the index file's length lines up with the header fields.
   struct stat f_stat;
@@ -61,6 +63,9 @@ FileIndexReader::FileIndexReader(std::string filename,
     HWSize_t left_to_read = header_.doctable_size + header_.index_size;
     while (left_to_read > 0) {
       // MISSING:
+		Verify333(fread(&buf, 1, 1, file_) == 1);
+		crcobj.FoldByteIntoCRC(buf[0]);
+		left_to_read--;
     }
     Verify333(crcobj.GetFinalCRC() == header_.checksum);
   }

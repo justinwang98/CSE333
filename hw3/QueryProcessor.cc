@@ -65,6 +65,73 @@ QueryProcessor::ProcessQuery(const vector<string> &query) {
 
   // MISSING:
 
+  for (HWSize_t i = 0; i < arraylen_; i++) {
+	  // initialize all the readers
+	  IndexTableReader *indR = itr_array_[i];
+	  DocTableReader *docR = dtr_array_[i];
+	  DocIDTableReader *didR = indR->LookupWord(query[0]);
+
+	  // check if docidtable is null/empty
+	  if (didR != nullptr) {
+		  list<docid_element_header> list1 = didR->GetDocIDList();
+
+		  // loop thru the rest of the query
+		  for (HWSize_t j = 1; j < query.size(); j++) {
+			  didR = indR->LookupWord(query[j]);
+
+			  // check if docidtable is null/empty
+			  if (didR != nullptr) {
+				  // initialize secondary list and iterators
+				  int seen = 0;
+				  list<docid_element_header> list2 = didR->GetDocIDList();
+
+				  list<docid_element_header>::iterator iter1;
+				  list<docid_element_header>::iterator iter2;
+				  
+				  // loop thru both lists
+				  for (iter1 = list1.begin(); iter1 != list1.end();) {
+					  for (iter2 = list2.begin(); iter2 != list2.end();) {
+						  // deal with same docid
+						  if (iter1->docid == iter2->docid) {
+							  seen++;
+							  iter1->num_positions += iter2->num_positions;
+							  break;
+						  }
+						  iter2++;
+					  }
+					  if (seen != 0) {
+						  iter1++;
+						  seen = 0;
+					  }
+					  else {
+						  iter1 = list1.erase(iter1);
+					  }
+				  }
+
+			  }
+			  else {
+				  list1.clear();
+				  break;
+			  }
+		  }
+		  
+		  // check if original list is empty
+		  if (!list1.empty()) {
+			  list<docid_element_header>::iterator iter;
+			  string name;
+
+			  // create the query to be pushed onto the finalresult list
+			  for (iter = list1.begin(); iter != list1.end();) {
+				  docR->LookupDocID(iter->docid, &name);
+				  QueryResult query{ name, iter->num_positions};
+				  finalresult.push_back(query);
+				  iter++;
+			  }
+		  }
+		  // cleanup
+		  delete didR;
+	  }
+  }
 
   // Sort the final results.
   std::sort(finalresult.begin(), finalresult.end());
