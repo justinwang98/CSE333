@@ -1,0 +1,18 @@
+
+    ====  CSE 333 HW3 Feedback  ====
+
+Test Suite: 180/180
+
+Valgrind:  3/5
+(-2) Valgrind returns a some leaks and errors.
+
+Modularity and error checking:  9/10
+(-1) Calculates checksum reading one byte at a time. Read more bytes into a buffer instead of calling fread for every byte.
+
+Code Quality, Comments and Style issues:  3/5
+(-2) cpplint returns a number of formatting errors.
+
+Index file writing and Searchshell output:  5/10
+(-5) Missing searchshell implementation.
+
+Extra credit:   /5
