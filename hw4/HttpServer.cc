@@ -153,12 +153,12 @@ HttpResponse ProcessFileRequest(const std::string &uri,
   up.Parse(uri);
 
   // acquire the path
-  fname = up.get_path();
+  fname = up.get_path().substr(8);
 
   // read the path into mem
   FileReader fr(basedir, fname);
   std::string fContents;
-  if (fr.ReadFile(&fContents) != 0) {
+  if (fr.ReadFile(&fContents) == true) {
 	  //copy file contents
 	  ret.body = fContents;
 
@@ -237,21 +237,21 @@ HttpResponse ProcessQueryRequest(const std::string &uri,
 
   // MISSING:
   
-  ret.body = "<html><head><title>333gle</title></head>";
-  ret.body += "<body>";
-  ret.body += "<center style = \"font - size:500 % ; \">";
-  ret.body += "< span style = \"position:relative; bottom:-0.33em; color:orange; \">3 < / span > < span style = \"color:red; \">3 < / span > < span style = \"color:gold; \">3 < / span > <span style = \"color:blue; \">g< / span><span style = \"color:green; \">l< / span><span style = \"color:red; \">e< / span>";
-  ret.body += "< / center>";
-  ret.body += "<p>";
-  ret.body += "< / p><div style = \"height:20px; \">< / div>";
-  ret.body += "<center>";
-  ret.body += "<form action = \" / query\" method = \"get\">";
-  ret.body += "<input type = \"text\" size = \"30\" name = \"terms\">";
-  ret.body += "<input type = \"submit\" value = \"Search\">";
-  ret.body += "< / form>";
-  ret.body += "< / center><p>";
+  ret.body = "<html><head><title>333gle</title></head>\n";
+  ret.body += "<body>\n";
+  ret.body += "<center style = \"font-size:500%;\">\n";
+  ret.body += "<span style = \"position:relative;bottom:-0.33em;color:orange;\">3</span><span style = \"color:red;\">3</span><span style = \"color:gold;\">3</span><span style = \"color:blue;\">g</span><span style = \"color:green;\">l</span><span style = \"color:red;\">e</span>\n";
+  ret.body += "</center>\n";
+  ret.body += "<p>\n";
+  ret.body += "</p><div style = \"height:20px;\"></div>\n";
+  ret.body += "<center>\n";
+  ret.body += "<form action = \"/query\" method = \"get\">\n";
+  ret.body += "<input type = \"text\" size = \"30\" name = \"terms\">\n";
+  ret.body += "<input type = \"submit\" value = \"Search\">\n";
+  ret.body += "</form>\n";
+  ret.body += "</center><p>\n";
   ret.body += "\n\n";
-  ret.body += "< / p>";
+  ret.body += "</p>";
 
   // create and use parser to get back search terms
   URLParser up;
@@ -275,24 +275,24 @@ HttpResponse ProcessQueryRequest(const std::string &uri,
 		  ret.body += "<p><br>";
 		  ret.body += "No results found for <b>";
 		  ret.body += terms;;
-		  ret.body += "< / b>";
-		  ret.body += "< / p><p>\n</p>";
+		  ret.body += "</b>";
+		  ret.body += "</p><p>\n</p>";
 	  }
 	  else { // parse results
 		  if(results.size() == 1){
 			  ret.body += "<p><br>";
-			  ret.body += "1 results found for <b>";
+			  ret.body += "1 result found for <b>";
 			  ret.body += terms;
-			  ret.body += "< / b>";
-			  ret.body += "< / p><p>\n</p>";
+			  ret.body += "</b>";
+			  ret.body += "</p><p>\n</p>";
 		  }
 		  else { //greater than 1
 			  ret.body += "<p><br>";
-			  ret.body += results.size();
+			  ret.body += std::to_string(results.size());
 			  ret.body += " results found for <b>";
 			  ret.body += terms;
-			  ret.body += "< / b>";
-			  ret.body += "< / p><p>\n</p>";
+			  ret.body += "</b>";
+			  ret.body += "</p><p>\n</p>";
 		  }
 		  // now add in the ul
 		  ret.body += "<ul>\n";
@@ -304,16 +304,16 @@ HttpResponse ProcessQueryRequest(const std::string &uri,
 			  }
 			  ret.body += results[i].document_name + "\">\n";
 			  ret.body += results[i].document_name + "</a>\n";
-			  ret.body += "\" [";
-			  ret.body += results[i].rank;
-			  ret.body += "]\"\n<br>\n</li>\n";
+			  ret.body += "[";
+			  ret.body += std::to_string(results[i].rank);
+			  ret.body += "]\n<br>\n</li>\n";
 		  }
-		  ret.body += "<\\ul>\n";
+		  ret.body += "</ul>\n";
 	  }
 	  
   } 
   
-  ret.body += "< / body>\n< / html>";
+  ret.body += "</body></html>";
   ret.protocol = "HTTP/1.1";
   ret.response_code = 200;
   ret.message = "OK";
