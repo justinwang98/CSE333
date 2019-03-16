@@ -256,7 +256,7 @@ HttpResponse ProcessQueryRequest(const std::string &uri,
   // create and use parser to get back search terms
   URLParser up;
   up.Parse(uri);
-  std::string terms = up.get_args()["terms"];
+  std::string terms = EscapeHTML(up.get_args()["terms"]);
   if (terms.compare("") != 0) { // there was a previous search with terms
 
 	  // to lower and trimmed
