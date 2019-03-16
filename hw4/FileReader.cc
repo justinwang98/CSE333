@@ -14,6 +14,7 @@
 #include <cstdlib>
 #include <iostream>
 #include <sstream>
+#include <memory>
 
 extern "C" {
   #include "libhw2/fileparser.h"
@@ -41,8 +42,17 @@ bool FileReader::ReadFile(std::string *str) {
   // HttpUtils.h above the MallocDeleter class for details.
 
   // MISSING:
-
-
+  if (!IsPathSafe(basedir_, fullfile)) {
+	  return false;
+  }
+  HWSize_t size = 0;
+  //std::unique_ptr<char, MallocDeleter<char>> contents(::ReadFile(fullfile.c_str(), &size));
+  char* contents = ::ReadFile(fullfile.c_str(), &size);
+  if (contents == nullptr) {
+	  return false;
+  }
+  *str = std::string(contents, size);
+  free(contents);
   return true;
 }
 

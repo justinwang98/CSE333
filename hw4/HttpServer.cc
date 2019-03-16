@@ -94,7 +94,20 @@ void HttpServer_ThrFn(ThreadPool::Task *t) {
     // the connection.
 
     // MISSING:
+	  HttpRequest request;
+	  HttpConnection connect(hst->client_fd);
+	  if (!connect.GetNextRequest(&request)) {
+		  done = true;
+		  connect.~HttpConnection();
+	  }
+	  HttpResponse response = ProcessRequest(request, hst->basedir, hst->indices);
+	  
+	  if (!connect.WriteResponse(response) || request.headers["connection"] == "close") {
+		  done = true;
+		  connect.~HttpConnection();
+	  }
   }
+  
 }
 
 HttpResponse ProcessRequest(const HttpRequest &req,
@@ -135,6 +148,54 @@ HttpResponse ProcessFileRequest(const std::string &uri,
   std::string fname = "";
 
   // MISSING:
+  //create urlparser and parse
+  URLParser up;
+  up.Parse(uri);
+
+  // acquire the path
+  fname = up.get_path();
+
+  // read the path into mem
+  FileReader fr(basedir, fname);
+  std::string fContents;
+  if (fr.ReadFile(&fContents) != 0) {
+	  //copy file contents
+	  ret.body = fContents;
+
+	  //set response type accordingly
+
+	  boost::trim(fname);
+	  std::vector<std::string> fileNameParts;
+	  boost::iter_split(fileNameParts, fname, boost::algorithm::first_finder("."));
+	  std::string headerType = fileNameParts[1];
+
+	  if (headerType.compare("html") == 0 || headerType.compare("htm") == 0) {
+		  ret.headers["Content-type"] = "text/html";
+	  }
+	  else if (headerType.compare("css") == 0) {
+		  ret.headers["Content-type"] = "text/css";
+	  }
+	  else if (headerType.compare("xml") == 0) {
+		  ret.headers["Content-type"] = "text/xml";
+	  }
+	  else if (headerType.compare("javascript") == 0) {
+		  ret.headers["Content-type"] = "application/javascript";
+	  }
+	  else if (headerType.compare("jpeg") == 0 || headerType.compare("jpg") == 0) {
+		  ret.headers["Content-type"] = "image/jpeg";
+	  }
+	  else if (headerType.compare("png") == 0) {
+		  ret.headers["Content-type"] = "image/png";
+	  }
+	  else if (headerType.compare("gif") == 0) {
+		  ret.headers["Content-type"] = "image/gif";
+	  }
+
+	  ret.protocol = "HTTP/1.1";
+	  ret.response_code = 200;
+	  ret.message = "OK";
+	  return ret;
+  }
 
 
 
@@ -175,8 +236,87 @@ HttpResponse ProcessQueryRequest(const std::string &uri,
   //    in our solution_binaries/http333d.
 
   // MISSING:
+  
+  ret.body = "<html><head><title>333gle</title></head>";
+  ret.body += "<body>";
+  ret.body += "<center style = \"font - size:500 % ; \">";
+  ret.body += "< span style = \"position:relative; bottom:-0.33em; color:orange; \">3 < / span > < span style = \"color:red; \">3 < / span > < span style = \"color:gold; \">3 < / span > <span style = \"color:blue; \">g< / span><span style = \"color:green; \">l< / span><span style = \"color:red; \">e< / span>";
+  ret.body += "< / center>";
+  ret.body += "<p>";
+  ret.body += "< / p><div style = \"height:20px; \">< / div>";
+  ret.body += "<center>";
+  ret.body += "<form action = \" / query\" method = \"get\">";
+  ret.body += "<input type = \"text\" size = \"30\" name = \"terms\">";
+  ret.body += "<input type = \"submit\" value = \"Search\">";
+  ret.body += "< / form>";
+  ret.body += "< / center><p>";
+  ret.body += "\n\n";
+  ret.body += "< / p>";
 
+  // create and use parser to get back search terms
+  URLParser up;
+  up.Parse(uri);
+  std::string terms = up.get_args()["terms"];
+  if (terms.compare("") != 0) { // there was a previous search with terms
 
+	  // to lower and trimmed
+	  boost::trim(terms);
+	  boost::to_lower(terms);
+	  //construct QueryProcessor
+	  hw3::QueryProcessor qp(*indices, false);
+
+	  std::vector<std::string> queryTerms;
+	  boost::iter_split(queryTerms, terms, boost::algorithm::first_finder(" "));
+
+	  // process queries
+	  std::vector<hw3::QueryProcessor::QueryResult> results = qp.ProcessQuery(queryTerms);
+
+	  if (results.empty() == true) { // no results
+		  ret.body += "<p><br>";
+		  ret.body += "No results found for <b>";
+		  ret.body += terms;;
+		  ret.body += "< / b>";
+		  ret.body += "< / p><p>\n</p>";
+	  }
+	  else { // parse results
+		  if(results.size() == 1){
+			  ret.body += "<p><br>";
+			  ret.body += "1 results found for <b>";
+			  ret.body += terms;
+			  ret.body += "< / b>";
+			  ret.body += "< / p><p>\n</p>";
+		  }
+		  else { //greater than 1
+			  ret.body += "<p><br>";
+			  ret.body += results.size();
+			  ret.body += " results found for <b>";
+			  ret.body += terms;
+			  ret.body += "< / b>";
+			  ret.body += "< / p><p>\n</p>";
+		  }
+		  // now add in the ul
+		  ret.body += "<ul>\n";
+
+		  for (unsigned int i = 0; i < results.size(); i++) {
+			  ret.body += "<li>\n <a href=\"";
+			  if (results[i].document_name.find("http://") == string::npos) { // add  static
+				  ret.body += "/static/";
+			  }
+			  ret.body += results[i].document_name + "\">\n";
+			  ret.body += results[i].document_name + "</a>\n";
+			  ret.body += "\" [";
+			  ret.body += results[i].rank;
+			  ret.body += "]\"\n<br>\n</li>\n";
+		  }
+		  ret.body += "<\\ul>\n";
+	  }
+	  
+  } 
+  
+  ret.body += "< / body>\n< / html>";
+  ret.protocol = "HTTP/1.1";
+  ret.response_code = 200;
+  ret.message = "OK";
   return ret;
 }
 

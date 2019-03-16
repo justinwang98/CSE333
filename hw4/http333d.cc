@@ -94,5 +94,17 @@ void GetPortAndPath(int argc,
   //      are readable files.
 
   // MISSING:
+
+	*port = atoi(argv[1]);
+	if (argc >= 30 || argc < 4 || *port > 65535 || *port < 1024 || access(argv[2], R_OK) == -1) { // checks a,b,c, and part of d
+		Usage(argv[0]);
+	}
+	*path = std::string(argv[2]);
+	for (int i = 3; i < argc; i++) { //checks the rest of d
+		if (access(argv[i], R_OK) == -1) {
+			Usage(argv[0]);
+		}
+		indices->push_back(argv[i]);
+	}
 }
 
