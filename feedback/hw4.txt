@@ -1,0 +1,15 @@
+
+    ====  CSE 333 HW4 Feedback  ====
+
+Test Suite: 140/140
+
+Code quality, comments and style issues:   7/10
+(-3) cpplint returns many formatting errors.
+
+Error checks:  4/5
+(-1) HttpServer_ThrFn sets done=true if GetNextRequest fails, but keeps going.
+
+Server test:   9/10
+(-1) Creates new connection for every request. Define connection outside the while loop.
+
+Extra credit:  /5
